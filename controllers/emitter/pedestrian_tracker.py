@@ -1,10 +1,9 @@
-from time import time
 
 
 class PedestrianTracker:
     def __init__(self):
         self.no_detection_frames = 0
-        self.frames_threshold = 50  # Number of consecutive frames without detection to confirm absence
+        self.frames_threshold = 40  # Number of consecutive frames without detection to confirm absence
         self.person_detected = False  # Whether a person has been detected in the current sequence
         
     def update(self, detected):
