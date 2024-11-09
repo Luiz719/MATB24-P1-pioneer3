@@ -1,10 +1,15 @@
-from controller import Robot
+from controller import Robot, Motor
 import cv2
 import numpy as np
+from utils import detect_yellow_ball, handle_received_message
+from movement import FourWheelController
+from message import Message
 
 # Initialize Webots Robot
 robot = Robot()
 timestep = int(robot.getBasicTimeStep())
+
+mv_controller = FourWheelController(robot, timestep)
 
 # Initialize the camera
 camera = robot.getDevice("camera")
@@ -14,43 +19,46 @@ camera.enable(timestep)
 receiver = robot.getDevice("receiver")
 receiver.enable(timestep)
 
-# Initialize HOG descriptor with pre-trained SVM for person detection
-hog = cv2.HOGDescriptor()
-hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+# Initialize 4-wheel motors
+left_front_motor = robot.getDevice("front left wheel")
+left_back_motor = robot.getDevice("back left wheel")
+right_front_motor = robot.getDevice("front right wheel")
+right_back_motor = robot.getDevice("back right wheel")
 
-# Function to handle received messages
-def handle_received_message():
-    while receiver.getQueueLength() > 0:
-        message = receiver.getData().decode("utf-8")  # Decode the message
-        print(f"Received message: {message}")
-        
-        # Example: You can implement additional logic based on message content
-        # For example, change robot behavior based on command
-        if message == "stop":
-            print("Stopping person detection as per command.")
-        elif message == "start":
-            print("Starting person detection as per command.")
-        
-        receiver.nextPacket()  # Move to the next message in the queue
+messenger = Message(robot, receiver)
 
 # Main loop
 while robot.step(timestep) != -1:
     # Handle received messages
-    handle_received_message()
+    messenger.handle_received_message()
 
     # Capture image from Webots camera
     img = np.frombuffer(camera.getImage(), np.uint8).reshape((camera.getHeight(), camera.getWidth(), 4))
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)  # Convert to BGR format for OpenCV
 
-    # Detect persons in the image
-    (persons, _) = hog.detectMultiScale(img, winStride=(8, 8), padding=(8, 8), scale=1.05)
+    # Detect yellow ball in the image
+    ball_detected = detect_yellow_ball(img)
     
-    # Draw bounding boxes around detected persons
-    for (x, y, w, h) in persons:
-        cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+    # If a yellow ball is detected, send a message
+    if ball_detected:
+        # for motor in [left_front_motor, left_back_motor, right_front_motor, right_back_motor]:
+        #     motor.setVelocity(0)
+
+        message = "Yellow ball detected! Stopping"
+        print(f"{message}")
+
+    # Get sensor values and update state
+    wheel_weights = mv_controller.get_sensor_values()
+    speeds = mv_controller.update_state(wheel_weights)
+    
+    # Update wheel velocities
+    if(not messenger.go):
+        mv_controller.update_speed([0, 0, 0, 0])
+    else:
+        mv_controller.update_speed(speeds)
 
     # Display the output (optional for debugging within Webots)
-    cv2.imshow("Person Detection", img)
+    cv2.imshow("Ball Detection", img)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
