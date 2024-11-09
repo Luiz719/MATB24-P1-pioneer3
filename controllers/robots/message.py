@@ -20,7 +20,6 @@ class Message:
                 print(f"<== Received message: {message}")
 
             detectedBy = "R" if "R" in message else "L"
-            print(detectedBy)
             if (self.last_emitter == "L" and detectedBy == "R") or (self.last_emitter == "R" and detectedBy == "L"):
                 self.go = True
                 print(f"{self.robot.name} is resuming action...")
